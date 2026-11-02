@@ -27,7 +27,7 @@ type Place = {
 
 const radiusOptions = [1, 2, 5, 10, 25] as const
 const SPIN_MS = 1400
-const SPIN_NAMES = ["Da Michele", "L'Asador", "Café Sperl", "Ramen Spot", "The Corner"] as const
+const SPIN_NAMES = ["A change of scenery", "Your next favorite", "Somewhere worth going", "A little adventure"] as const
 const API = "/api/m/places.pick"
 
 type PoolSource = "all" | "list" | "tag"
@@ -71,6 +71,20 @@ export function PickPage() {
   const [geoError, setGeoError] = useState<string | null>(null)
   const [geoLoading, setGeoLoading] = useState(false)
   const [avoidRecent, setAvoidRecent] = useState(true)
+  const [avoidRecentDays, setAvoidRecentDays] = useState("14")
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [preferenceMessage, setPreferenceMessage] = useState("")
+  const validDays = /^\d+$/.test(avoidRecentDays) && Number(avoidRecentDays) >= 1 && Number(avoidRecentDays) <= 365
+  async function saveDefaults() {
+    setSaving(true)
+    setPreferenceMessage("")
+    try {
+      await apiJson(`${API}/preferences`, { method: "PUT", body: JSON.stringify({ avoidRecent, avoidRecentDays: Number(avoidRecentDays) }) })
+      setPreferenceMessage("Your defaults are saved.")
+    } catch (error) { setPreferenceMessage(error instanceof Error ? error.message : "Could not save defaults") }
+    finally { setSaving(false) }
+  }
   const [previewCount, setPreviewCount] = useState<number | null>(null)
   const [previewError, setPreviewError] = useState<string | null>(null)
   const [spinning, setSpinning] = useState(false)
@@ -79,6 +93,9 @@ export function PickPage() {
   const [spinError, setSpinError] = useState<string | null>(null)
 
   useEffect(() => {
+    void apiJson<{ avoidRecent: boolean; avoidRecentDays: number }>(`${API}/preferences`)
+      .then((value) => { setAvoidRecent(value.avoidRecent); setAvoidRecentDays(String(value.avoidRecentDays)); setPreferencesLoaded(true) })
+      .catch(() => { setPreferenceMessage("Could not load defaults. Using 14 days."); setPreferencesLoaded(true) })
     void apiJson<ListRow[]>("/api/lists")
       .then(setLists)
       .catch(() => setLists([]))
@@ -116,18 +133,20 @@ export function PickPage() {
   }, [nearMe])
 
   const request = useMemo(() => {
+    if (!preferencesLoaded || !validDays) return null
     if (poolSource === "list" && !listId) return null
     if (poolSource === "tag" && !tagName) return null
     if (nearMe && !near) return null
     return {
       avoidRecent,
+      avoidRecentDays: Number(avoidRecentDays),
       ...(category ? { category } : {}),
       open: openTonight ? ("tonight" as const) : undefined,
       list: poolSource === "list" ? listId : undefined,
       tag: poolSource === "tag" ? tagName : undefined,
       ...(nearMe && near ? { near, radiusKm } : {}),
     }
-  }, [avoidRecent, category, listId, near, nearMe, openTonight, poolSource, radiusKm, tagName])
+  }, [preferencesLoaded, validDays, avoidRecentDays, avoidRecent, category, listId, near, nearMe, openTonight, poolSource, radiusKm, tagName])
 
   useEffect(() => {
     if (!request) {
@@ -137,6 +156,7 @@ export function PickPage() {
     }
     let cancelled = false
     setPreviewError(null)
+    setPreviewCount(null)
     void apiJson<{ count: number }>(`${API}/preview`, {
       method: "POST",
       body: JSON.stringify(request),
@@ -192,13 +212,21 @@ export function PickPage() {
 
   return (
     <div
-      style={{ maxWidth: 512, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 }}
+      className="pick-page"
     >
-      <header style={{ textAlign: "center" }}>
+      <style>{`
+.pick-page{max-width:1040px;margin:0 auto;display:grid;grid-template-columns:minmax(280px,1fr) minmax(0,1.2fr);gap:24px;color:var(--parchment,#f3ebe1)}
+.pick-page>header{grid-column:1/-1;padding:12px 0 20px;border-bottom:1px solid var(--crate-edge,#3a322c)}
+.pick-page>section{grid-column:1;grid-row:2/4}.pick-page>.pick-result{grid-column:2;grid-row:2;align-self:start}
+.pick-page button,.pick-page select,.pick-page input[type=number]{min-height:44px}.pick-page button:disabled{opacity:.5;cursor:not-allowed}.pick-page :focus-visible{outline:2px solid var(--action,#e8a54b);outline-offset:4px}
+.pick-page input[type=checkbox]{accent-color:var(--action,#e8a54b);width:18px;height:18px}.pick-page .pick-result{box-shadow:0 16px 48px #0002}.pick-page .pick-result img{width:100%;max-height:260px;object-fit:cover;border-radius:12px}
+@media(max-width:720px){.pick-page{grid-template-columns:minmax(0,1fr)}.pick-page>section,.pick-page>.pick-result{grid-column:1;grid-row:auto}}
+      `}</style>
+      <header>
         <p
           style={{ fontSize: 12, letterSpacing: "0.2em", textTransform: "uppercase", opacity: 0.6 }}
         >
-          Library
+          FROM YOUR SAVED PLACES
         </p>
         <h1
           style={{
@@ -208,10 +236,10 @@ export function PickPage() {
             textTransform: "uppercase",
           }}
         >
-          Pick
+          Where to next?
         </h1>
         <p style={{ fontSize: 14, opacity: 0.7 }}>
-          One place from your library — any type, open tonight, near you, or surprise me.
+          Good places. Fewer decisions. Set the mood and let Pick choose.
         </p>
       </header>
 
@@ -222,11 +250,12 @@ export function PickPage() {
           gap: 16,
           padding: 20,
           border: "1px solid var(--crate-edge, #3a322c)",
-          borderRadius: 8,
+          borderRadius: 20,
           background: "var(--crate, #2a2420)",
           color: "var(--parchment, #f3ebe1)",
         }}
       >
+        <h2 style={{ margin: 0, fontSize: 20 }}>Make it your kind of place</h2>
         <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 14 }}>
           Type
           <select
@@ -327,11 +356,22 @@ export function PickPage() {
           <input
             type="checkbox"
             checked={avoidRecent}
+            disabled={!preferencesLoaded || saving}
             onChange={(e) => setAvoidRecent(e.target.checked)}
           />
-          Avoid recent picks (14 days)
+          Avoid recent picks
         </label>
 
+        <label style={{ display: "grid", gap: 8 }}>
+          Days before picking a place again
+          <input type="number" min="1" max="365" step="1" value={avoidRecentDays} disabled={!preferencesLoaded || saving}
+            onChange={(event) => { setAvoidRecentDays(event.target.value); setPreferenceMessage("") }} style={selectStyle} aria-invalid={!validDays} />
+        </label>
+        {!validDays && <p role="alert">Enter a whole number from 1 to 365.</p>}
+        <button type="button" style={linkBtnOutline} disabled={!preferencesLoaded || !validDays || saving} onClick={() => void saveDefaults()}>
+          {saving ? "Saving…" : "Save as my defaults"}
+        </button>
+        <small role="status">{preferenceMessage || "Save the recent-pick switch and days for your next visit."}</small>
         <div
           style={{
             display: "flex",
@@ -356,11 +396,11 @@ export function PickPage() {
           </p>
           <button
             type="button"
-            disabled={!request || spinning || previewCount === 0}
+            disabled={!request || spinning || previewCount == null || previewCount === 0}
             onClick={choose}
             style={{
               padding: "10px 18px",
-              borderRadius: 8,
+              borderRadius: 20,
               border: "none",
               background: "var(--action, #e8a54b)",
               color: "var(--action-fg, #1a1612)",
@@ -379,9 +419,10 @@ export function PickPage() {
       )}
 
       <div
+        className="pick-result"
         style={{
-          minHeight: 192,
-          borderRadius: 8,
+          minHeight: 300,
+          borderRadius: 20,
           border: "1px solid var(--crate-edge, #3a322c)",
           background: "var(--crate-raised, #342c26)",
           color: "var(--parchment, #f3ebe1)",
@@ -390,7 +431,7 @@ export function PickPage() {
         aria-live="polite"
       >
         {spinning ? (
-          <div style={{ height: 192, display: "grid", placeItems: "center", textAlign: "center" }}>
+          <div style={{ minHeight: 300, display: "grid", placeItems: "center", textAlign: "center" }}>
             <div>
               <p style={{ fontSize: 28, margin: 0, textTransform: "uppercase" }}>
                 {spinLabel || "…"}
@@ -408,7 +449,8 @@ export function PickPage() {
             </div>
           </div>
         ) : result ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: 16 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: 24 }}>
+            {result.coverThumbUrl && <img src={result.coverThumbUrl} alt="" />}
             <div>
               <p
                 style={{
@@ -418,7 +460,7 @@ export function PickPage() {
                   opacity: 0.7,
                 }}
               >
-                Tonight
+                YOUR NEXT STOP
               </p>
               <h2 style={{ margin: "4px 0", fontSize: 24, textTransform: "uppercase" }}>
                 {result.name}
@@ -437,7 +479,7 @@ export function PickPage() {
               </a>
               <button
                 type="button"
-                disabled={!request || (previewCount ?? 1) <= 0}
+                disabled={!request || spinning || previewCount == null || previewCount <= 0}
                 onClick={choose}
                 style={linkBtnOutline}
               >
@@ -448,7 +490,7 @@ export function PickPage() {
         ) : (
           <div
             style={{
-              height: 192,
+              minHeight: 300,
               display: "grid",
               placeItems: "center",
               textAlign: "center",
@@ -457,10 +499,10 @@ export function PickPage() {
           >
             <div>
               <p style={{ fontSize: 20, textTransform: "uppercase", margin: 0 }}>
-                Ready when you are
+                Leave room for a surprise
               </p>
               <p style={{ fontSize: 14, opacity: 0.7 }}>
-                Pick a type, set the pool, then hit choose.
+                Your next stop is already in your library. Let’s find it.
               </p>
             </div>
           </div>

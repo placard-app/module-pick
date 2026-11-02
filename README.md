@@ -2,6 +2,8 @@
 
 Pick one place at random from your Placard library. Narrow the pool by category,
 list, tag, opening hours or distance, and avoid places picked in the last 14 days.
+Choose a window of 1–365 days and use **Save as my defaults** to remember both
+the avoidance switch and duration per account. New accounts start at 14 days.
 The module adds a **Pick** navigation page at `/m/places.pick` and an MCP tool for
 assistants.
 
@@ -56,8 +58,7 @@ Supported categories are `restaurant`, `cafe`, `bar`, `park`, `museum`, `cinema`
 `hotel`, `trail` and `other`.
 
 Every successful pick records history, including picks made with avoidance off
-and picks made through MCP. Avoidance excludes that user's picks from the last
-14 days. Previewing the pool does not record a pick.
+and picks made through MCP. Avoidance excludes that user's picks from the configured number of days. Previewing the pool does not record a pick.
 
 ## MCP
 
@@ -89,6 +90,7 @@ All filters are optional:
 | `list` | A Placard list ID |
 | `tag` | A tag name |
 | `status` | `want_to_go` or `been_there` |
+| `avoidRecentDays` | Whole number from 1 to 365; defaults to the account’s saved window |
 | `avoidRecent` | Exclude this user's recent picks when `true` |
 
 Unlike the page's initial settings, an MCP call with `{}` applies no filters and
@@ -104,7 +106,7 @@ the fallback is `<PLACARD_MODULES_DIR>/places.pick`, or
 `./data/modules/places.pick` when that environment variable is unset.
 
 Back up the history file with module writers stopped if you want to preserve
-recent-pick avoidance. Pick does not modify places or lists. The 14-day window
+recent-pick avoidance. Pick does not modify places or lists. The configured window
 controls filtering; older history rows are not automatically removed. Storage
 retention across updates or uninstall depends on the host's handling of this
 module directory.
@@ -120,8 +122,8 @@ pnpm --filter @placard-official/places.pick build
 ```
 
 The build recreates `pack/` and writes the two installable archives under `dist/`
-inside this module directory. There is currently no automated test script for
-Pick. For a manual check, install the archive, verify pool counts and filters,
+inside this module directory. Run `pnpm --filter @placard-official/places.pick test` for preference isolation,
+validation and exclusion-window tests. For a manual check, install the archive, verify pool counts and filters,
 spin twice with avoidance enabled, and call the MCP tool.
 
 | Path | Purpose |
@@ -155,3 +157,7 @@ tags such as `places.pick@0.1.1`.
   module visibility setting.
 - **Wrong module offered by GitHub:** use the full install URL with `#places.pick`,
   or upload the Pick release asset directly.
+
+Preferences are stored in `<ctx.rootDir>/data/preferences/`, in one file per hashed
+owner ID. Include this directory when backing up defaults. GET and PUT
+`/api/m/places.pick/preferences` read and save the current account’s defaults.

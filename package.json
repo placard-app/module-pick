@@ -10,7 +10,8 @@
   "scripts": {
     "build": "node ./scripts/build.mjs",
     "build:zip": "node ./scripts/build.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test tests/*.test.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",

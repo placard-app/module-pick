@@ -1,4 +1,5 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises"
+import { mkdir, readFile, writeFile, rename } from "node:fs/promises"
+import { createHash, randomUUID } from "node:crypto"
 import { join } from "node:path"
 import type { CreateModuleResult, ModuleMcpContext, ModuleMcpResult } from "../placard-sdk.ts"
 
@@ -16,13 +17,25 @@ const placeCategories = [
 
 type PlaceCategory = (typeof placeCategories)[number]
 
-const AVOID_MS = 14 * 24 * 60 * 60 * 1000
+type Preferences = { avoidRecent: boolean; avoidRecentDays: number }
+const defaults: Preferences = { avoidRecent: true, avoidRecentDays: 14 }
+const preferencePath = (root: string, owner: string) => join(root, "data", "preferences", `${createHash("sha256").update(owner).digest("hex")}.json`)
+async function readPreferences(root: string, owner: string): Promise<Preferences> {
+  try { return JSON.parse(await readFile(preferencePath(root, owner), "utf8")) }
+  catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return { ...defaults }; throw error }
+}
+function validateDays(value: unknown): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 365)
+    throw new Error("Choose a whole number of days between 1 and 365")
+  return value
+}
 
 type PickRow = { ownerId: string; placeId: string; pickedAt: string }
 
 type SearchHit = { place: { id: string; name: string; category: string; [key: string]: unknown } }
 
 type PickRequest = {
+  avoidRecentDays?: number
   avoidRecent?: boolean
   category?: PlaceCategory
   open?: "now" | "tonight"
@@ -95,8 +108,8 @@ const writePicks = async (rootDir: string, rows: ReadonlyArray<PickRow>) => {
   await writeFile(join(dir, "picks.json"), JSON.stringify(rows, null, 2))
 }
 
-const recentIds = (rows: ReadonlyArray<PickRow>, ownerId: string, now: number) => {
-  const cutoff = now - AVOID_MS
+const recentIds = (rows: ReadonlyArray<PickRow>, ownerId: string, now: number, days: number) => {
+  const cutoff = now - days * 24 * 60 * 60 * 1000
   return new Set(
     rows
       .filter((row) => row.ownerId === ownerId && Date.parse(row.pickedAt) >= cutoff)
@@ -118,6 +131,7 @@ const emptyMessage = (request: PickRequest) => {
 }
 
 const parsePickRequest = (body: Record<string, unknown>): PickRequest => {
+  if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error("Expected an object")
   const category = body.category
   if (category != null && category !== "" && !placeCategories.includes(category as PlaceCategory)) {
     throw new Error("Invalid category")
@@ -125,6 +139,7 @@ const parsePickRequest = (body: Record<string, unknown>): PickRequest => {
   const filter: PickRequest = {
     avoidRecent: body.avoidRecent === true,
   }
+  if (body.avoidRecentDays !== undefined) filter.avoidRecentDays = validateDays(body.avoidRecentDays)
   if (typeof category === "string" && category !== "") filter.category = category as PlaceCategory
   if (body.open === "now" || body.open === "tonight") filter.open = body.open
   if (typeof body.text === "string") filter.text = body.text
@@ -147,7 +162,7 @@ const parseBody = async (request: Request): Promise<PickRequest> => {
 }
 
 const toSearchPayload = (pickRequest: PickRequest) => {
-  const { avoidRecent: _, ...filter } = pickRequest
+  const { avoidRecent: _, avoidRecentDays: _days, ...filter } = pickRequest
   return filter
 }
 
@@ -167,7 +182,8 @@ const queryPool = async (
   let hits = (await searchRes.json()) as SearchHit[]
   if (pickRequest.avoidRecent) {
     const rows = await readPicks(rootDir)
-    const recent = recentIds(rows, ownerId, Date.now())
+    const days = pickRequest.avoidRecentDays ?? (await readPreferences(rootDir, ownerId)).avoidRecentDays
+    const recent = recentIds(rows, ownerId, Date.now(), days)
     hits = hits.filter((hit) => !recent.has(hit.place.id))
   }
   return hits
@@ -217,6 +233,7 @@ const pickPlaceInputSchema = {
     list: { type: "string" },
     status: { type: "string", enum: ["want_to_go", "been_there"] },
     avoidRecent: { type: "boolean" },
+    avoidRecentDays: { type: "integer", minimum: 1, maximum: 365, description: "Exclusion window in days; defaults to your saved preference." },
   },
 }
 
@@ -260,6 +277,22 @@ export function createModule(): CreateModuleResult {
       const ownerId = resolveOwnerId(ctx)
       const fetchHost = hostFetchFor(request, ctx)
       try {
+        if (path === "preferences") {
+          if (!ctx.ownerId) return json({ message: "Authentication required" }, 401)
+          if (request.method === "GET") return json(await readPreferences(rootDir, ownerId))
+          if (request.method === "PUT") {
+            const body = await request.json()
+            if (!body || typeof body.avoidRecent !== "boolean") throw new Error("avoidRecent must be a boolean")
+            const preferences = { avoidRecent: body.avoidRecent, avoidRecentDays: validateDays(body.avoidRecentDays) }
+            const target = preferencePath(rootDir, ownerId)
+            await mkdir(join(rootDir, "data", "preferences"), { recursive: true })
+            const temporary = `${target}.${randomUUID()}.tmp`
+            await writeFile(temporary, JSON.stringify(preferences))
+            await rename(temporary, target)
+            return json(preferences)
+          }
+          return json({ message: "Use GET or PUT" }, 405)
+        }
         if (request.method === "GET" && (path === "" || path === "meta")) {
           return json({
             id: "places.pick",
