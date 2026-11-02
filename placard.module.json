@@ -13,7 +13,7 @@
   ],
   "source": "upload",
   "packageName": "placard-places-pick",
-  "sdkVersion": "0.1.0",
+  "sdkVersion": "0.2.0",
   "serverEntry": "./server/index.js",
   "webEntry": "./web/index.js",
   "icon": "./web/assets/cover.svg",

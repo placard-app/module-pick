@@ -9,8 +9,8 @@ assistants.
 
 ## Requirements and permissions
 
-- A Placard host supporting SDK major **0**, module uploads and the
-  `globalThis.__PLACARD_PLUGIN__` web bridge (`sdkVersion: 0.1.0`).
+- A Placard host supporting SDK **0.2.0+**, module uploads and the
+  `globalThis.__PLACARD_PLUGIN__` web bridge (`sdkVersion: 0.2.0`).
 - Manifest permissions: `places.read` and `search.query`.
 - Browser location permission when using **Near me**.
 
