@@ -215,7 +215,7 @@ export function PickPage() {
       className="pick-page"
     >
       <style>{`
-.pick-page{max-width:1040px;margin:0 auto;display:grid;grid-template-columns:minmax(280px,1fr) minmax(0,1.2fr);gap:24px;color:var(--parchment,#f3ebe1)}
+.pick-page{max-width:1040px;margin:0 auto;display:grid;grid-template-columns:minmax(280px,1fr) minmax(0,1.2fr);gap:24px;color:var(--foreground,var(--parchment-ink,#1a1612))}
 .pick-page>header{grid-column:1/-1;padding:12px 0 20px;border-bottom:1px solid var(--crate-edge,#3a322c)}
 .pick-page>section{grid-column:1;grid-row:2/4}.pick-page>.pick-result{grid-column:2;grid-row:2;align-self:start}
 .pick-page button,.pick-page select,.pick-page input[type=number]{min-height:44px}.pick-page button:disabled{opacity:.5;cursor:not-allowed}.pick-page :focus-visible{outline:2px solid var(--action,#e8a54b);outline-offset:4px}
