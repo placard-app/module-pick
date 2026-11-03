@@ -145,7 +145,7 @@ The module HTTP base is `/api/m/places.pick`:
 
 The POST endpoints accept the same filters as the MCP tool. See the
 [workspace release instructions](../../README.md#release-one-module) for independent
-tags such as `places.pick@0.1.1`.
+tags such as `places.pick@0.2.0`.
 
 ## Troubleshooting
 

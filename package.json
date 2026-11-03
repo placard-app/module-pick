@@ -1,8 +1,8 @@
 {
   "name": "@placard-official/places.pick",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
-  "description": "Placard Marketplace module \u2014 spin one place from your library",
+  "description": "Placard Marketplace module — spin one place from your library",
   "engines": {
     "node": ">=24"
   },

@@ -1,9 +1,12 @@
 {
   "id": "places.pick",
   "name": "Pick",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Spin one place from your library — any category, open now, near you, or surprise me.",
-  "permissions": ["places.read", "search.query"],
+  "permissions": [
+    "places.read",
+    "search.query"
+  ],
   "nav": [
     {
       "path": "/m/places.pick",
