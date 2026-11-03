@@ -36,3 +36,58 @@ test("preferences persist per owner and control preview without leaking into sea
     assert.equal((await call("preferences", "GET", undefined, "")).status, 401)
   } finally { await rm(rootDir, { recursive: true, force: true }) }
 })
+
+
+test("metadata loads the current account's place types from core", async () => {
+  const app = createModule().createHttpApp!
+  const categories = ["restaurant", "bakery", "Record shop"]
+  for (const pathSuffix of ["", "meta"]) {
+    const response = await app(new Request("http://localhost/meta"), {
+      moduleId: "places.pick", rootDir: "/unused", ownerId: "alice", pathSuffix,
+      hostFetch: async (path) => {
+        assert.equal(path, "/api/me/place-types")
+        return Response.json({ types: categories })
+      },
+    })
+    assert.deepEqual(await response.json(), { id: "places.pick", categories })
+  }
+  const response = await app(new Request("http://localhost/meta"), {
+    moduleId: "places.pick", rootDir: "/unused", ownerId: "alice", pathSuffix: "meta",
+    hostFetch: async () => new Response(null, { status: 404 }),
+  })
+  assert.equal(response.status, 502)
+})
+
+test("preview, spin and MCP support core built-ins and custom place types", async () => {
+  const rootDir = await mkdtemp(join(tmpdir(), "pick-types-"))
+  try {
+    const module = createModule()
+    const hostFetch = async (path: string, init?: RequestInit) => {
+      assert.equal(path, "/api/search")
+      const { category } = JSON.parse(String(init?.body))
+      assert.ok(["bakery", "Record shop"].includes(category))
+      return Response.json([{ place: { id: "one", name: "One", category } }])
+    }
+    const ctx = { moduleId: "places.pick", rootDir, ownerId: "alice", hostFetch }
+    for (const category of ["bakery", " Record shop "]) {
+      for (const pathSuffix of ["preview", "spin"]) {
+        const response = await module.createHttpApp!(new Request(`http://localhost/${pathSuffix}`, {
+          method: "POST", body: JSON.stringify({ category }),
+        }), { ...ctx, pathSuffix })
+        assert.equal(response.status, 200)
+        const body = await response.json()
+        if (pathSuffix === "preview") assert.equal(body.count, 1)
+        else assert.equal(body.place.category, category.trim())
+      }
+      const result = await module.mcpTools![0]!.handler({ category }, ctx)
+      assert.equal(result.ok, true)
+      if (result.ok) assert.equal((result.data as { category: string }).category, category.trim())
+    }
+    for (const category of [42, [], {}, "   ", "x".repeat(81)]) {
+      const result = await module.mcpTools![0]!.handler({ category }, ctx)
+      assert.equal(result.ok, false)
+    }
+    const schema = module.mcpTools![0]!.def.inputSchema as { properties: { category: Record<string, unknown> } }
+    assert.equal(schema.properties.category.enum, undefined)
+  } finally { await rm(rootDir, { recursive: true, force: true }) }
+})

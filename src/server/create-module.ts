@@ -3,20 +3,6 @@ import { createHash, randomUUID } from "node:crypto"
 import { join } from "node:path"
 import type { CreateModuleResult, ModuleMcpContext, ModuleMcpResult } from "../placard-sdk.ts"
 
-const placeCategories = [
-  "restaurant",
-  "cafe",
-  "bar",
-  "park",
-  "museum",
-  "cinema",
-  "hotel",
-  "trail",
-  "other",
-] as const
-
-type PlaceCategory = (typeof placeCategories)[number]
-
 type Preferences = { avoidRecent: boolean; avoidRecentDays: number }
 const defaults: Preferences = { avoidRecent: true, avoidRecentDays: 14 }
 const preferencePath = (root: string, owner: string) => join(root, "data", "preferences", `${createHash("sha256").update(owner).digest("hex")}.json`)
@@ -37,7 +23,7 @@ type SearchHit = { place: { id: string; name: string; category: string; [key: st
 type PickRequest = {
   avoidRecentDays?: number
   avoidRecent?: boolean
-  category?: PlaceCategory
+  category?: string
   open?: "now" | "tonight"
   text?: string
   near?: { lat: number; lng: number }
@@ -132,15 +118,15 @@ const emptyMessage = (request: PickRequest) => {
 
 const parsePickRequest = (body: Record<string, unknown>): PickRequest => {
   if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error("Expected an object")
-  const category = body.category
-  if (category != null && category !== "" && !placeCategories.includes(category as PlaceCategory)) {
-    throw new Error("Invalid category")
+  const category = typeof body.category === "string" ? body.category.trim() : body.category
+  if (category != null && (typeof category !== "string" || category.length > 80 || (body.category !== "" && category.length === 0))) {
+    throw new Error("Invalid category: use a place type between 1 and 80 characters")
   }
   const filter: PickRequest = {
     avoidRecent: body.avoidRecent === true,
   }
   if (body.avoidRecentDays !== undefined) filter.avoidRecentDays = validateDays(body.avoidRecentDays)
-  if (typeof category === "string" && category !== "") filter.category = category as PlaceCategory
+  if (typeof category === "string" && category !== "") filter.category = category
   if (body.open === "now" || body.open === "tonight") filter.open = body.open
   if (typeof body.text === "string") filter.text = body.text
   if (body.near && typeof body.near === "object") {
@@ -219,8 +205,9 @@ const pickPlaceInputSchema = {
   properties: {
     category: {
       type: "string",
-      enum: [...placeCategories],
-      description: "Optional place category. Omit for any type.",
+      minLength: 1,
+      maxLength: 80,
+      description: "Optional Placard place type, including custom types. Omit for any type.",
     },
     text: { type: "string" },
     open: { type: "string", enum: ["now", "tonight"] },
@@ -294,10 +281,10 @@ export function createModule(): CreateModuleResult {
           return json({ message: "Use GET or PUT" }, 405)
         }
         if (request.method === "GET" && (path === "" || path === "meta")) {
-          return json({
-            id: "places.pick",
-            categories: [...placeCategories],
-          })
+          const response = await fetchHost("/api/me/place-types")
+          if (!response.ok) return json({ message: `Could not load Placard place types (${response.status})` }, 502)
+          const { types } = await response.json() as { types: string[] }
+          return json({ id: "places.pick", categories: types })
         }
 
         if (request.method === "POST" && path === "preview") {

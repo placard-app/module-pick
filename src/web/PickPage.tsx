@@ -1,20 +1,6 @@
 import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "react"
 import { Link } from "react-router"
 
-const placeCategories = [
-  "restaurant",
-  "cafe",
-  "bar",
-  "park",
-  "museum",
-  "cinema",
-  "hotel",
-  "trail",
-  "other",
-] as const
-
-type PlaceCategory = (typeof placeCategories)[number]
-
 type Place = {
   id: string
   name: string
@@ -34,7 +20,7 @@ type PoolSource = "all" | "list" | "tag"
 type ListRow = { id: string; name: string }
 type TagRow = { name: string }
 
-const categoryLabel = (c: PlaceCategory) => c.replaceAll("_", " ")
+const categoryLabel = (c: string) => c.replaceAll("_", " ")
 
 async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -60,7 +46,9 @@ function mapsGoogle(place: Place) {
 export function PickPage() {
   const [lists, setLists] = useState<ListRow[] | null>(null)
   const [tags, setTags] = useState<TagRow[] | null>(null)
-  const [category, setCategory] = useState<PlaceCategory | "">("")
+  const [placeCategories, setPlaceCategories] = useState<string[] | null>(null)
+  const [categoryError, setCategoryError] = useState<string | null>(null)
+  const [category, setCategory] = useState("")
   const [poolSource, setPoolSource] = useState<PoolSource>("all")
   const [listId, setListId] = useState("")
   const [tagName, setTagName] = useState("")
@@ -96,6 +84,9 @@ export function PickPage() {
     void apiJson<{ avoidRecent: boolean; avoidRecentDays: number }>(`${API}/preferences`)
       .then((value) => { setAvoidRecent(value.avoidRecent); setAvoidRecentDays(String(value.avoidRecentDays)); setPreferencesLoaded(true) })
       .catch(() => { setPreferenceMessage("Could not load defaults. Using 14 days."); setPreferencesLoaded(true) })
+    void apiJson<{ categories: string[] }>(`${API}/meta`)
+      .then((value) => setPlaceCategories(value.categories))
+      .catch((error) => setCategoryError(error instanceof Error ? error.message : "Could not load place types"))
     void apiJson<ListRow[]>("/api/lists")
       .then(setLists)
       .catch(() => setLists([]))
@@ -260,17 +251,20 @@ export function PickPage() {
           Type
           <select
             value={category}
-            onChange={(e) => setCategory(e.target.value as PlaceCategory | "")}
+            onChange={(e) => setCategory(e.target.value)}
+            disabled={placeCategories === null}
             style={selectStyle}
           >
             <option value="">Any type</option>
-            {placeCategories.map((c) => (
+            {(placeCategories ?? []).map((c) => (
               <option key={c} value={c}>
                 {categoryLabel(c)}
               </option>
             ))}
           </select>
         </label>
+
+        {categoryError && <p role="alert">{categoryError}</p>}
 
         <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 14 }}>
           Pool

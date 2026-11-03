@@ -54,8 +54,9 @@ disabled; when enabled, it requests your browser location and offers 1, 2, 5, 10
 25 km radii (5 km by default). A list, tag or location must be available before a
 pick using that filter can run.
 
-Supported categories are `restaurant`, `cafe`, `bar`, `park`, `museum`, `cinema`,
-`hotel`, `trail` and `other`.
+The Type selector loads Placard’s built-in and account-specific custom place types
+from core. This requires a host providing `GET /api/me/place-types`; types are no
+longer hard-coded in the module.
 
 Every successful pick records history, including picks made with avoidance off
 and picks made through MCP. Avoidance excludes that user's picks from the configured number of days. Previewing the pool does not record a pick.
@@ -82,7 +83,7 @@ All filters are optional:
 
 | Argument | Value / behavior |
 | --- | --- |
-| `category` | One of the category IDs above; omit for any type |
+| `category` | A Placard place type (including custom types); omit for any type |
 | `text` | Search text passed to Placard |
 | `open` | `now` or `tonight`; omit for no opening-hours filter |
 | `near` | Coordinates as `{ "lat": number, "lng": number }` |
@@ -139,7 +140,7 @@ The module HTTP base is `/api/m/places.pick`:
 
 | Method and suffix | Result |
 | --- | --- |
-| `GET /` or `GET /meta` | Module ID and supported categories |
+| `GET /` or `GET /meta` | Module ID and current account’s core place types |
 | `POST /preview` | `{ "count": number }` for the supplied filters |
 | `POST /spin` | `{ "place": ... }`, or HTTP 404 with `_tag: "PickPoolEmpty"` |
 
