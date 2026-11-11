@@ -144,7 +144,7 @@ The module HTTP base is `/api/m/places.pick`:
 | `POST /spin` | `{ "place": ... }`, or HTTP 404 with `_tag: "PickPoolEmpty"` |
 
 The POST endpoints accept the same filters as the MCP tool. See the
-[workspace release instructions](../../README.md#release-one-module) for independent
+[release instructions](#standalone-releases) for independent
 tags such as `places.pick@0.2.0`.
 
 ## Troubleshooting
