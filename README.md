@@ -22,22 +22,21 @@ matching use the host's search behavior and stored place data.
 In **Settings → Module marketplace → Install from GitHub**, paste:
 
 ```text
-https://github.com/JobiJoba/plugins#places.pick
+https://github.com/placard-app/module-pick
 ```
 
-Enable the module and show it in your navigation. Keep the `#places.pick` selector
-so the installer selects Pick's releases in this multi-module repository.
+Enable the module and show it in your navigation. 
 
 Alternatively, upload Pick's `.placard-module` or `.zip` from
-[Releases](https://github.com/JobiJoba/plugins/releases). For a local package, run
+[Releases](https://github.com/placard-app/module-pick/releases). For a local package, run
 from the repository root:
 
 ```sh
 pnpm install
-pnpm --filter @placard-official/places.pick build
+pnpm build
 ```
 
-Upload `plugins/places.pick/dist/places.pick-<version>.zip` or the equivalent
+Upload `dist/places.pick-<version>.zip` or the equivalent
 `.placard-module` file. The version comes from `placard.module.json`; both archives
 contain the same package.
 
@@ -118,12 +117,12 @@ Requires Node.js 24+ and pnpm 12.4.1. From the repository root:
 
 ```sh
 pnpm install
-pnpm --filter @placard-official/places.pick typecheck
-pnpm --filter @placard-official/places.pick build
+pnpm typecheck
+pnpm build
 ```
 
 The build recreates `pack/` and writes the two installable archives under `dist/`
-inside this module directory. Run `pnpm --filter @placard-official/places.pick test` for preference isolation,
+inside this module directory. Run `pnpm test` for preference isolation,
 validation and exclusion-window tests. For a manual check, install the archive, verify pool counts and filters,
 spin twice with avoidance enabled, and call the MCP tool.
 
@@ -162,3 +161,7 @@ tags such as `places.pick@0.2.0`.
 Preferences are stored in `<ctx.rootDir>/data/preferences/`, in one file per hashed
 owner ID. Include this directory when backing up defaults. GET and PUT
 `/api/m/places.pick/preferences` read and save the current account’s defaults.
+
+## Standalone releases
+
+Install from https://github.com/placard-app/module-pick. Merge the manifest and package version change through a pull request. Tag the merged commit as `places.pick@<version>` to publish both archives.
