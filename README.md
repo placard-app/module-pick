@@ -32,7 +32,7 @@ Alternatively, upload Pick's `.placard-module` or `.zip` from
 from the repository root:
 
 ```sh
-pnpm install
+pnpm install --frozen-lockfile
 pnpm build
 ```
 
@@ -116,7 +116,7 @@ module directory.
 Requires Node.js 24+ and pnpm 12.4.1. From the repository root:
 
 ```sh
-pnpm install
+pnpm install --frozen-lockfile
 pnpm typecheck
 pnpm build
 ```
